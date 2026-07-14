@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>이그니스 — 도트 로그라이크 RPG</title>
-<!-- ===== PWA (v1.0.3) ===== -->
+<!-- ===== PWA (v1.1) ===== -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0e0c12">
 <meta name="mobile-web-app-capable" content="yes">
@@ -104,6 +104,11 @@
   .hSlot{width:88px;padding:7px 4px 5px;cursor:pointer;background:#1a120c;
     border:2px solid var(--gold-dk);box-shadow:inset 0 0 0 1px #00000066, 0 3px 0 #0008;
     font-family:'Galmuri11','DungGeunMo',sans-serif;}
+  .hSlot.lock img{filter:grayscale(1) brightness(.45);}
+  .hSlot.lock .hn{color:#7a6f5c;}
+  .hPrice{color:#ff9a3c;}
+  #emberBal{margin:2px 0 10px;font-size:13px;color:#e8b45e;letter-spacing:1px;}
+  #emberBal em{font-style:normal;color:#ffe0a0;}
   .hSlot.sel{border-color:var(--gold-hi);background:#2a1c10;
     box-shadow:0 0 14px #ff9a3c55, inset 0 0 0 1px var(--gold), 0 3px 0 #0008;}
   .hSlot img{width:56px;height:56px;image-rendering:pixelated;display:block;margin:0 auto;}
@@ -312,9 +317,10 @@
   <div class="heroHead">캐릭터 선택</div>
   <div id="heroSelect"></div>
   <div id="heroDesc">균형 잡힌 능력치. 처음이라면 아렌.</div>
+  <div id="emberBal">🔥 불씨 <em id="emberN">0</em></div>
   <p class="lore">몬스터를 잡아 성장하고, 다섯 지역을 돌파하세요.</p>
   <button class="btn" id="btnStart">게임 시작</button>
-  <div class="ver">v1.0.3</div>
+  <div class="ver">v1.1</div>
 </div>
 
 <div id="levelup" class="overlay">
@@ -344,6 +350,7 @@
   <h2>죽었습니다</h2>
   <div class="stats">
     <div class="s panel"><div class="v" id="dLv">1</div><div class="k">레벨</div></div>
+    <div class="s panel"><div class="v" id="dEmber">+0</div><div class="k">🔥 불씨</div></div>
   </div>
   <button class="btn" id="btnRetry">게임 종료</button>
 </div>
@@ -356,6 +363,7 @@
     <div class="s panel"><div class="v" id="wLv">1</div><div class="k">레벨</div></div>
     <div class="s panel"><div class="v" id="wKill">0</div><div class="k">승리</div></div>
     <div class="s panel"><div class="v" id="wTime">0:00</div><div class="k">시간</div></div>
+    <div class="s panel"><div class="v" id="wEmber">+0</div><div class="k">🔥 불씨</div></div>
   </div>
   <button class="btn" id="btnAgain">게임 종료</button>
 </div>
@@ -363,7 +371,7 @@
 <script>
 'use strict';
 /* ============================================================
-   이그니스 v1.0.3 — 도트 로그라이크 RPG
+   이그니스 v1.1 — 도트 로그라이크 RPG
    · 필드 탐험 + 몬스터 접촉 시 1:1 턴제 전투
    · 커맨드: 공격 / 강타(SP) / 아이템 / 도망
    · 승리 시 경험치 + 낮은 확률 아이템 드랍
@@ -912,20 +920,55 @@ const HEROES=[
  {name:'브록', cls:'전사',   desc:'힘 +1 · 총 데미지 +15% · 받는 피해 +6%', mod:p=>{p.STR++;p.dmgMul*=1.15;p.guard-=0.06;}},
 ];
 let selHero=0;
+/* ---------- 메타 진행: 불씨 ----------
+   런이 끝나면(죽음·클리어) 잡은 몬스터 수에 비례해 불씨를 얻고,
+   불씨로 캐릭터를 해금한다. 기기 로컬에만 저장된다. */
+const HERO_COST=[0,60,100,150,220,300];
+const META=(()=>{
+  let m={embers:0,unlocked:[0]};
+  try{
+    const s=localStorage.getItem('ignis_meta');
+    if(s){const p=JSON.parse(s);if(p&&typeof p.embers==='number'&&Array.isArray(p.unlocked))m=p;}
+  }catch(e){/* 저장 불가 환경: 세션 한정으로 동작 */}
+  if(!m.unlocked.includes(0))m.unlocked.push(0);
+  return m;
+})();
+function saveMeta(){try{localStorage.setItem('ignis_meta',JSON.stringify(META));}catch(e){}}
+function heroUnlocked(i){return META.unlocked.includes(i);}
+function grantEmbers(n){META.embers+=n;saveMeta();}
+function updateEmberBal(){const el=document.getElementById('emberN');if(el)el.textContent=META.embers;}
 const heroImgs=HERO_IMG_DATA.map(d=>{const im=new Image();im._h=50;im.src=d;return im;});
 function buildHeroSelect(){
   const wrap=document.getElementById('heroSelect');
   if(!wrap)return;
+  if(!heroUnlocked(selHero))selHero=0;
   wrap.innerHTML='';
   HEROES.forEach((h,i)=>{
     const s=document.createElement('button');
-    s.className='hSlot'+(i===selHero?' sel':'');
-    s.innerHTML='<img src="'+HERO_IMG_DATA[i]+'"><div class="hn">'+h.name+'</div><div class="hc">'+h.cls+'</div>';
-    s.onclick=()=>{selHero=i;buildHeroSelect();beep(600,0.06,'square',0.03);};
+    const lock=!heroUnlocked(i);
+    s.className='hSlot'+(i===selHero?' sel':'')+(lock?' lock':'');
+    s.innerHTML='<img src="'+HERO_IMG_DATA[i]+'"><div class="hn">'+(lock?'🔒 ':'')+h.name+'</div><div class="hc">'+(lock?'<span class="hPrice">🔥 '+HERO_COST[i]+'</span>':h.cls)+'</div>';
+    s.onclick=()=>{
+      if(lock){
+        if(META.embers>=HERO_COST[i]){
+          META.embers-=HERO_COST[i];META.unlocked.push(i);saveMeta();
+          selHero=i;sfx.lvl();buildHeroSelect();
+          const d=document.getElementById('heroDesc');
+          if(d)d.textContent='🔥 '+h.name+' 해금! — '+h.desc;
+        }else{
+          beep(180,0.12,'square',0.05);
+          const d=document.getElementById('heroDesc');
+          if(d)d.textContent='🔒 불씨 '+HERO_COST[i]+' 필요 (보유 '+META.embers+') — 몬스터를 잡으면 불씨가 모인다';
+        }
+        return;
+      }
+      selHero=i;buildHeroSelect();beep(600,0.06,'square',0.03);
+    };
     wrap.appendChild(s);
   });
   const d=document.getElementById('heroDesc');
-  if(d)d.textContent=HEROES[selHero].desc;
+  if(d&&heroUnlocked(selHero))d.textContent=HEROES[selHero].desc;
+  updateEmberBal();
 }
 
 const MON_IMG={
@@ -1660,6 +1703,10 @@ function die(){
   state='dead';
   $('tutMsg').style.display='none';
   $('dLv').textContent=player.level;
+  // 불씨 지급: 잡은 몬스터 수 + 도달한 맵 × 5 (튜토리얼 성과는 초기화되므로 본편 기준)
+  const g=Math.round(kills+mapIdx*5);
+  grantEmbers(g);
+  $('dEmber').textContent='+'+g;
   setTimeout(()=>showOverlay('dead'),900);
 }
 function winSoon(){
@@ -1669,6 +1716,10 @@ function winSoon(){
     $('wLv').textContent=player.level;$('wKill').textContent=kills;
     const s=Math.floor(runT);
     $('wTime').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+    // 불씨 지급: 잡은 몬스터 수 × 2 + 완주 보너스 100
+    const g=Math.round(kills*2)+100;
+    grantEmbers(g);
+    $('wEmber').textContent='+'+g;
     showOverlay('win');sfx.lvl();
   },1200);
 }
@@ -3141,7 +3192,7 @@ function loop(now){
 requestAnimationFrame(loop);
 </script>
 <script>
-// ===== PWA: 서비스 워커 등록 (v1.0.3) =====
+// ===== PWA: 서비스 워커 등록 (v1.1) =====
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
