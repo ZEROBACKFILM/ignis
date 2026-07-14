@@ -5,7 +5,7 @@
  *  - 그 외(아이콘, 폰트 등): 캐시 우선 (런타임 캐싱)
  * 버전 올릴 때 CACHE_NAME 도 함께 올릴 것.
  */
-const CACHE_NAME = 'ignis-v1.0';
+const CACHE_NAME = 'ignis-v1.0.1';
 const PRECACHE = [
   './index.html',
   './manifest.webmanifest',
