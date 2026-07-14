@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.zerobackfilm.ignis",
+        "sha256_cert_fingerprints": ["1E:4E:F7:CA:6C:8D:D5:0C:72:EB:21:58:BB:15:07:10:A5:5B:92:74:2F:99:0A:AD:F7:C8:D1:28:DD:05:78:90"]
+      }
+    }]
