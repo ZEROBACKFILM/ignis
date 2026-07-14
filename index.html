@@ -937,6 +937,7 @@ function saveMeta(){try{localStorage.setItem('ignis_meta',JSON.stringify(META));
 function heroUnlocked(i){return META.unlocked.includes(i);}
 function grantEmbers(n){META.embers+=n;saveMeta();}
 function updateEmberBal(){const el=document.getElementById('emberN');if(el)el.textContent=META.embers;}
+let lockPreview=-1;
 const heroImgs=HERO_IMG_DATA.map(d=>{const im=new Image();im._h=50;im.src=d;return im;});
 function buildHeroSelect(){
   const wrap=document.getElementById('heroSelect');
@@ -947,21 +948,29 @@ function buildHeroSelect(){
     const s=document.createElement('button');
     const lock=!heroUnlocked(i);
     s.className='hSlot'+(i===selHero?' sel':'')+(lock?' lock':'');
-    s.innerHTML='<img src="'+HERO_IMG_DATA[i]+'"><div class="hn">'+(lock?'🔒 ':'')+h.name+'</div><div class="hc">'+(lock?'<span class="hPrice">🔥 '+HERO_COST[i]+'</span>':h.cls)+'</div>';
+    s.innerHTML='<img src="'+HERO_IMG_DATA[i]+'"><div class="hn">'+(lock?'🔒 ':'')+h.name+'</div><div class="hc">'+h.cls+(lock?' <span class="hPrice">🔥'+HERO_COST[i]+'</span>':'')+'</div>';
     s.onclick=()=>{
+      const d=document.getElementById('heroDesc');
       if(lock){
+        if(lockPreview!==i){
+          lockPreview=i;
+          beep(600,0.06,'square',0.03);
+          if(d)d.textContent='🔒 '+h.name+' ('+h.cls+') — '+h.desc+' · 해금 비용 🔥'+HERO_COST[i]+(META.embers>=HERO_COST[i]?' — 한 번 더 누르면 해금!':' (보유 '+META.embers+') — 몬스터를 잡으면 불씨가 모인다');
+          return;
+        }
         if(META.embers>=HERO_COST[i]){
           META.embers-=HERO_COST[i];META.unlocked.push(i);saveMeta();
+          lockPreview=-1;
           selHero=i;sfx.lvl();buildHeroSelect();
-          const d=document.getElementById('heroDesc');
-          if(d)d.textContent='🔥 '+h.name+' 해금! — '+h.desc;
+          const d2=document.getElementById('heroDesc');
+          if(d2)d2.textContent='🔥 '+h.name+' 해금! — '+h.desc;
         }else{
           beep(180,0.12,'square',0.05);
-          const d=document.getElementById('heroDesc');
           if(d)d.textContent='🔒 불씨 '+HERO_COST[i]+' 필요 (보유 '+META.embers+') — 몬스터를 잡으면 불씨가 모인다';
         }
         return;
       }
+      lockPreview=-1;
       selHero=i;buildHeroSelect();beep(600,0.06,'square',0.03);
     };
     wrap.appendChild(s);
